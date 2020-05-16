@@ -19,43 +19,52 @@ parser grammar SamXParser;
 options { tokenVocab = SamXLexer;  }
 
 @header {
-package net.signbit.samx.parser;
+#include <fstream>
+#include <sstream>
+#include <unordered_map>
+#include <string>
 }
 
 @parser::members
 {
 
-   private java.util.HashMap<String, net.signbit.samx.Parser.Result> includedDocuments = null;
-   private java.util.HashMap<String, java.io.IOException> includedExceptions = null;
+private:
+   //std::unordered_map<std::string, ParserResult> includedDocuments;
+   std::unordered_map<std::string, std::string> includedExceptions;
 
-   private java.util.HashMap<String, String> referencePaths = new java.util.HashMap<>();
-   private java.io.File basePath = null;
+   std::unordered_map<std::string, std::string> referencePaths;
+   std::string basePath;
 
-   private int currentHeaderLength = 0;
-   private boolean currentTailColumn = false;
+   int currentHeaderLength = 0;
+   bool currentTailColumn = false;
 
-   public void setBasePath(java.io.File aPath)
+public:
+   void setBasePath(std::string aPath)
    {
       basePath = aPath;
    }
 
-   public java.util.HashMap<String, String> getReferencePaths()
+   const std::unordered_map<std::string, std::string> getReferencePaths() const
    {
       return referencePaths;
    }
 
-   public void setIncludeDictionary(java.util.HashMap<String, net.signbit.samx.Parser.Result> aDict)
+#if 0
+   void setIncludeDictionary(std::unordered_map<std::string, ParserResult> aDict)
    {
       includedDocuments = aDict;
    }
+#endif
 
-   public void setIncludeExceptionsDictionary(java.util.HashMap<String, java.io.IOException> aDict)
+   void setIncludeExceptionsDictionary(std::unordered_map<std::string, std::string> aDict)
    {
       includedExceptions = aDict;
    }
 
-   private void parseFile(String reference)
+private:
+   void parseFile(std::string /* reference */)
    {
+#if 0
       java.io.File includeFile = new java.io.File(basePath, reference);
 
       if (includeFile.exists())
@@ -82,8 +91,10 @@ package net.signbit.samx.parser;
       {
          includedExceptions.put(includeFile.getAbsolutePath(), new java.io.FileNotFoundException(includeFile.getAbsolutePath()));
       }
+#endif
    }
 
+public:
 }
 
 nameList : NAME (COMMA NAME) + ;
@@ -154,41 +165,45 @@ flow : ( text | phrase | localInsert | url | inlineCode )+ ;
 paragraph : ( flow NEWLINE )+ NEWLINE ;
 
 headerRow
-   locals [ int columnCount = 0; boolean hasTailColumn = false; ]
-   : ( COLSEP NAME { $ctx.columnCount ++; } )+ (trailingBar=COLSEP { $ctx.hasTailColumn = true; } )? NEWLINE
+   locals [ int columnCount = 0; bool hasTailColumn = false; ]
+   : ( COLSEP NAME { $ctx->columnCount ++; } )+ (trailingBar=COLSEP { $ctx->hasTailColumn = true; } )? NEWLINE
    {
-      currentHeaderLength = $ctx.columnCount;
-      currentTailColumn = $ctx.hasTailColumn;
+      currentHeaderLength = $ctx->columnCount;
+      currentTailColumn = $ctx->hasTailColumn;
    };
 
 optionalFlow : flow? ;
 
 recordData
    locals [ int columnCount = 0; ]
-   : condition? ( COLSEP optionalFlow { $ctx.columnCount ++; } )+ NEWLINE
+   : condition? ( COLSEP optionalFlow { $ctx->columnCount ++; } )+ NEWLINE
    {
-      if (currentHeaderLength != $ctx.columnCount)
+      if (currentHeaderLength != $ctx->columnCount)
       {
-         if (((currentHeaderLength + 1) != $ctx.columnCount) || (! currentTailColumn))
+         if (((currentHeaderLength + 1) != $ctx->columnCount) || (! currentTailColumn))
          {
-            throw new ParseCancellationException("line " + $start.getLine() +
-               ":" + $start.getCharPositionInLine() +
-               " incorrect number of columns; expected " + currentHeaderLength +
-               " but observed " + $ctx.columnCount);
+            std::ostringstream os;
+            os << "line " << $ctx->start->getLine() <<
+               ":" << $ctx->start->getCharPositionInLine() <<
+               " incorrect number of columns; expected " << currentHeaderLength <<
+               " but observed " << $ctx->columnCount;
+            throw antlr4::ParseCancellationException(os.str());
          }
       }
    };
 
 recordSep
    locals [ int columnCount = 0; ]
-   : (STT_TBL_SEP { $ctx.columnCount ++; })+ NEWLINE
+   : (STT_TBL_SEP { $ctx->columnCount ++; })+ NEWLINE
    {
-      if (currentHeaderLength < $ctx.columnCount)
+      if (currentHeaderLength < $ctx->columnCount)
       {
-         throw new ParseCancellationException("line " + $start.getLine() +
-            ":" + $start.getCharPositionInLine() +
-            " incorrect number of columns; expected at most " + currentHeaderLength +
-            " but observed " + $ctx.columnCount);
+         std::ostringstream os;
+         os << "line " << $ctx->start->getLine() <<
+            ":" << $ctx->start->getCharPositionInLine() <<
+            " incorrect number of columns; expected at most " << currentHeaderLength <<
+            " but observed " << $ctx->columnCount;
+         throw antlr4::ParseCancellationException(os.str());
       }
    };
 

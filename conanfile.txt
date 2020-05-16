@@ -1,6 +1,7 @@
 [requires]
-antlr/4.8
+antlr4/4.8@signbit/testing
 gtest/1.10.0
+gflags/2.2.2
 
 [generators]
 cmake
