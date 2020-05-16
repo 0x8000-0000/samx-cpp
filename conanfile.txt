@@ -1,0 +1,6 @@
+[requires]
+antlr/4.8
+gtest/1.10.0
+
+[generators]
+cmake
