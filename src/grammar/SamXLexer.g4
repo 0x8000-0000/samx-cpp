@@ -31,7 +31,7 @@ tokens { INDENT, DEDENT, END, INVALID, BOL }
 @lexer::members 
 {
 private:
-   std::deque<antlr4::Token*> tokens;
+   std::deque<std::unique_ptr<antlr4::Token>> tokens;
    std::stack<int> indents;
 
    bool prepareProcessingCode = false;
@@ -53,20 +53,20 @@ public:
    void emit(std::unique_ptr<antlr4::Token> t) override
    {
       lastTokenPositionColumn = t->getCharPositionInLine() + t->getText().size() + 1;
-      tokens.push_back(t.release());
+      tokens.emplace_back(t.release());
    }
 
    std::unique_ptr<antlr4::Token> nextToken() override
    {
-      auto token = antlr4::Lexer::nextToken();
+      auto localToken = antlr4::Lexer::nextToken();
 
       if (! tokens.empty())
       {
-         token.reset(tokens.front());
+         localToken.reset(tokens.front().release());
          tokens.pop_front();
       }
 
-      return token;
+      return localToken;
    }
 
 private:
@@ -109,43 +109,32 @@ private:
    {
       const auto start = antlr4::Lexer::getCharIndex();
       auto _tokenFactorySourcePair = std::pair<antlr4::TokenSource *, antlr4::CharStream *>{this, getInputStream()};
-      auto token = _factory->create(_tokenFactorySourcePair, samx::SamXParser::SPACES, " ", WHITESPACE, start, start + 1, tokenStartLine, lastTokenPositionColumn);
-      tokens.push_back(token.release());
+      tokens.emplace_back(_factory->create(_tokenFactorySourcePair, samx::SamXParser::SPACES, " ", WHITESPACE, start, start + 1, tokenStartLine, lastTokenPositionColumn));
    }
 
    void addNewLine()
    {
-      auto newLine = makeToken(samx::SamXParser::NEWLINE, "\n");
-
-      tokens.push_back(newLine.release());
+      tokens.emplace_back(makeToken(samx::SamXParser::NEWLINE, "\n"));
    }
 
    void addEndBlock()
    {
-      auto endBlock = makeToken(samx::SamXParser::END, "¶");
-
-      tokens.push_back(endBlock.release());
+      tokens.push_back(makeToken(samx::SamXParser::END, "¶"));
    }
 
    void addIndent()
    {
-      auto indent = makeToken(samx::SamXParser::INDENT, ">>>", tokenStartLine + 1, 0);
-
-      tokens.push_back(indent.release());
+      tokens.push_back(makeToken(samx::SamXParser::INDENT, ">>>", tokenStartLine + 1, 0));
    }
 
    void addInvalid()
    {
-      auto invalid = makeToken(samx::SamXParser::INVALID, "???");
-
-      tokens.push_back(invalid.release());
+      tokens.push_back(makeToken(samx::SamXParser::INVALID, "???"));
    }
 
    void addDedent()
    {
-      auto dedent = makeToken(samx::SamXParser::DEDENT, "<<<");
-
-      tokens.push_back(dedent.release());
+      tokens.push_back(makeToken(samx::SamXParser::DEDENT, "<<<"));
    }
 
    void popIndents(int level)
@@ -173,8 +162,7 @@ private:
 
       const auto start = getCharIndex();
       auto _tokenFactorySourcePair = std::pair<antlr4::TokenSource *, antlr4::CharStream *>{this, getInputStream()};
-      auto token = _factory->create(_tokenFactorySourcePair, samx::SamXParser::BOL, builder, INDENTS, start, start + indentLevel, tokenStartLine + 1, 0);
-      tokens.push_back(token.release());
+      tokens.emplace_back(_factory->create(_tokenFactorySourcePair, samx::SamXParser::BOL, builder, INDENTS, start, start + indentLevel, tokenStartLine + 1, 0));
    }
 }
 
