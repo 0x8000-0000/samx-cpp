@@ -27,9 +27,18 @@ int main(int argc, char* argv[])
 
    tokens.fill();
 
+#if 0
    for (const auto* token : tokens.getTokens())
    {
       std::cout << token->toString() << std::endl;
+   }
+#endif
+
+   {
+      std::ifstream            inputFile(argv[1]);
+      antlr4::ANTLRInputStream input(inputFile);
+      samx::SamXLexer          lexer(&input);
+      lexer.getInterpreter<antlr4::atn::LexerATNSimulator>()->clearDFA();
    }
 
    return 0;

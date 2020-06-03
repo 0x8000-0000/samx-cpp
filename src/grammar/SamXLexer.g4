@@ -37,10 +37,8 @@ private:
    bool prepareProcessingCode = false;
    bool prepareFreeIndent = false;
 
-   bool processingCode = false;
+   int codeIndentLevel = 0;
    bool allowFreeIndent = false;
-
-   bool expectListStart = false;
 
    bool ignoreNewLinesInConditions = false;
    int nestedParenthesesLevel = 0;
@@ -166,8 +164,6 @@ private:
    }
 }
 
-EXTCODE : (~'\n')+ { processingCode }? ;
-
 ESCAPE : '\\' . ;
 
 SPACES : [ \t]+ -> channel(WHITESPACE) ;
@@ -217,11 +213,6 @@ NEWLINE
             addNewLine();
          }
 
-         if ((next == '*') || (next == '#'))
-         {
-            expectListStart = true;
-         }
-
          const auto currentIndent = indents.empty() ? 0 : indents.top();
 
          if (thisIndent == currentIndent)
@@ -233,7 +224,7 @@ NEWLINE
                addDedent();
 
                allowFreeIndent = false;
-               processingCode = false;
+               mode = Lexer::DEFAULT_MODE;
             }
          }
          else if (thisIndent > currentIndent)
@@ -243,39 +234,42 @@ NEWLINE
             if (prepareProcessingCode)
             {
                prepareProcessingCode = false;
-               processingCode = true;
-            }
-
-            if (prepareFreeIndent)
-            {
-               prepareFreeIndent = false;
-               allowFreeIndent = true;
-
-               /* Add indent token here to indicate the contained elements
-               * but do not record this particular indent since it might be
-               * deep inside the table due to the column alignment and
-               * conditions.
-               *
-               * Instead, record a level just after the table level.
-               */
-               indents.push(currentIndent + 1);
-               addIndent();
-            }
-
-            if (! allowFreeIndent)
-            {
+               codeIndentLevel = currentIndent;
+               mode = EXTERNAL_CODE;
                indents.push(thisIndent);
                addIndent();
+            }
+            else
+            {
+               if (prepareFreeIndent)
+               {
+                  prepareFreeIndent = false;
+                  allowFreeIndent = true;
+
+                  /* Add indent token here to indicate the contained elements
+                  * but do not record this particular indent since it might be
+                  * deep inside the table due to the column alignment and
+                  * conditions.
+                  *
+                  * Instead, record a level just after the table level.
+                  */
+                  indents.push(currentIndent + 1);
+                  addIndent();
+               }
+
+               if (! allowFreeIndent)
+               {
+                  indents.push(thisIndent);
+                  addIndent();
+               }
             }
          }
          else
          {
             addNewLine();
-
             popIndents(thisIndent);
 
             allowFreeIndent = false;
-            processingCode = false;
          }
 
          skip();
@@ -338,15 +332,11 @@ RECSEP : '::' { prepareFreeIndent = true; };
 
 COLSEP : '|' ;
 
-BULLET : { expectListStart }? '*' { expectListStart = false; } ;
-
-BULL_T : { !expectListStart }? '*' ;
+BULLET : '*' ;
 
 STT_PREC_GRID : '###' { prepareFreeIndent = true; };
 
-HASH : { expectListStart }? '#' { expectListStart = false; } ;
-
-HASH_T : { !expectListStart }? '#' ;
+HASH : '#' ;
 
 OPEN_PHR : '{' { ignoreNewLinesInPhrases = true; };
 
@@ -433,3 +423,37 @@ STT_HDR_SEP : '+' ('='| '+' )+ '+' ;
 
 GEN_ROW_SEP : '+' ('+' | '-' | ' ')+ ;
 
+mode EXTERNAL_CODE ;
+
+EXTCODE : (~'\n')+ ;
+
+EXTCODE_NEWLINE
+   : ( '\r'? '\n' | '\r' | '\f' ) SPACES?
+   {
+      {
+         const auto& tokenText = getText();
+
+         int thisIndent = 0;
+         for (char ch: tokenText)
+         {
+            if (ch == ' ')
+            {
+               thisIndent ++;
+            }
+         }
+
+         if (thisIndent > codeIndentLevel)
+         {
+            addNewLine();
+            addCodeIndent(thisIndent);
+         }
+         else
+         {
+            addNewLine();
+
+            mode = Lexer::DEFAULT_MODE;
+         }
+
+         skip();
+      }
+   } ;
